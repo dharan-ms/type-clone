@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>TypeForge</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#090d0b;--surface:#0e1510;--border:#1a2e1e;
+  --text:#b8f0c0;--muted:#6abf7a;--muted2:#4a7a54;
+  --accent:#39ff7a;--accent-dim:rgba(57,255,122,0.1);
+  --correct:#39ff7a;--incorrect:#ff4f4f;--extra:#cc2222;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;-webkit-font-smoothing:antialiased}
+body{display:flex;flex-direction:column;align-items:center;padding:0 1.5rem 4rem}
+
+/* topbar */
+.topbar{width:100%;max-width:920px;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1.5rem 0 1.2rem;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.brand{font-family:'Syne',sans-serif;font-weight:800;font-size:1.2rem;color:var(--accent);letter-spacing:-0.02em}
+.mode-nav{display:flex;gap:3px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:3px}
+.mode-btn{background:transparent;border:none;color:var(--muted2);font-family:'JetBrains Mono',monospace;font-size:0.78rem;padding:0.35rem 0.9rem;border-radius:6px;cursor:pointer;transition:.15s}
+.mode-btn:hover{color:var(--text);background:#111f14}
+.mode-btn.active{background:var(--accent-dim);color:var(--accent)}
+.live-stats{display:flex;gap:6px}
+.stat-pill{display:flex;flex-direction:column;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:.3rem .9rem;min-width:56px}
+.stat-label{font-size:.58rem;color:var(--muted2);letter-spacing:.12em;text-transform:uppercase}
+.stat-val{font-size:1.05rem;font-weight:500;line-height:1.3;color:var(--text)}
+.restart-btn{background:transparent;border:1px solid var(--border);color:var(--muted2);border-radius:8px;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;flex-shrink:0}
+.restart-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+
+/* typing area */
+.main{width:100%;max-width:920px;margin-top:4rem}
+.typing-container{position:relative;cursor:text}
+.words-viewport{position:relative;height:7.2rem;overflow:hidden;-webkit-mask-image:linear-gradient(to bottom,transparent 0%,black 18%,black 82%,transparent 100%);mask-image:linear-gradient(to bottom,transparent 0%,black 18%,black 82%,transparent 100%)}
+.words{display:flex;flex-wrap:wrap;gap:.5rem .65rem;padding:.1rem 0;will-change:transform;transition:transform .22s cubic-bezier(.4,0,.2,1)}
+.word{display:inline-flex;position:relative;border-bottom:2px solid transparent;transition:border-color .1s}
+.word.wrong-word{border-bottom-color:var(--incorrect)}
+.char{font-size:1.3rem;line-height:2.2rem;color:var(--muted)}
+.char.correct{color:var(--correct)}
+.char.incorrect{color:var(--incorrect)}
+.char.extra{color:var(--extra);font-style:italic}
+
+/* caret */
+.caret{position:absolute;width:2px;height:1.7rem;background:var(--accent);border-radius:2px;pointer-events:none;z-index:5;box-shadow:0 0 7px var(--accent);animation:blink 1s ease-in-out infinite;transition:left .04s,top .04s}
+.caret.typing{animation:none;opacity:1}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* focus overlay */
+.focus-overlay{position:absolute;inset:0;background:rgba(17,17,19,.75);backdrop-filter:blur(4px);border-radius:8px;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;z-index:10}
+.typing-container.unfocused .focus-overlay{opacity:1;pointer-events:all}
+.focus-msg{font-size:.72rem;color:var(--muted2);letter-spacing:.1em;text-transform:uppercase}
+
+/* results */
+.results-panel{width:100%;max-width:920px;margin-top:3rem;display:flex;flex-direction:column;gap:2rem;animation:fadeUp .3s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.results-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:2.5rem;display:flex;flex-direction:column;align-items:center;gap:1.8rem;position:relative;overflow:hidden}
+.results-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}
+.results-title{font-size:.68rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted2)}
+.results-stats{display:flex;gap:3rem;flex-wrap:wrap;justify-content:center}
+.result-block{display:flex;flex-direction:column;align-items:center;gap:.25rem}
+.result-num{font-family:'Syne',sans-serif;font-size:3.8rem;font-weight:800;color:var(--accent);line-height:1;letter-spacing:-0.03em}
+.result-lbl{font-size:.62rem;color:var(--muted2);letter-spacing:.15em;text-transform:uppercase}
+.big-restart{background:var(--accent-dim);border:1px solid rgba(57,255,122,.3);color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:.8rem;letter-spacing:.08em;padding:.7rem 2.2rem;border-radius:8px;cursor:pointer;transition:.15s}
+.big-restart:hover{background:rgba(57,255,122,.18);border-color:var(--accent)}
+.history-section{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.5rem 1.8rem}
+.history-title{font-size:.65rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted2);padding-bottom:.75rem;margin-bottom:.75rem;border-bottom:1px solid var(--border)}
+.history-list{list-style:none;display:flex;flex-direction:column}
+.hi{display:grid;grid-template-columns:32px 80px 70px 60px 56px 1fr;gap:.8rem;align-items:center;padding:.55rem 0;border-bottom:1px solid var(--border);font-size:.78rem;color:var(--muted2)}
+.hi:last-child{border-bottom:none}
+.hi .hw{color:var(--text);font-size:.95rem;font-weight:500}
+.hi .ha{color:var(--correct)}
+.hi .her{color:var(--incorrect)}
+.hi .hm{color:var(--accent)}
+.history-empty{font-size:.75rem;color:var(--muted2);text-align:center;padding:1rem 0}
+</style>
+</head>
+<body>
+
+<input id="hi" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+  style="position:fixed;top:-999px;left:-999px;opacity:0;width:1px;height:1px;pointer-events:none"/>
+
+<div class="topbar">
+  <div class="brand">⌨ TypeForge</div>
+  <nav class="mode-nav" id="modeNav">
+    <button class="mode-btn active" data-s="15">15s</button>
+    <button class="mode-btn" data-s="30">30s</button>
+    <button class="mode-btn" data-s="60">60s</button>
+  </nav>
+  <div class="live-stats">
+    <div class="stat-pill"><span class="stat-label">time</span><span class="stat-val" id="dTime">15</span></div>
+    <div class="stat-pill"><span class="stat-label">wpm</span><span class="stat-val" id="dWpm">—</span></div>
+    <div class="stat-pill"><span class="stat-label">acc</span><span class="stat-val" id="dAcc">—</span></div>
+  </div>
+  <button class="restart-btn" id="rBtn" title="Restart (Esc)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>
+  </button>
+</div>
+
+<div class="main" id="mainArea">
+  <div class="typing-container unfocused" id="tc">
+    <div class="focus-overlay" id="fo"><span class="focus-msg">click or press any key to start</span></div>
+    <div class="words-viewport" id="wv"><div class="words" id="words"></div></div>
+    <div class="caret" id="caret"></div>
+  </div>
+</div>
+
+<section class="results-panel" id="resultsPanel" style="display:none">
+  <div class="results-card">
+    <div class="results-title">test complete</div>
+    <div class="results-stats">
+      <div class="result-block"><div class="result-num" id="rWpm">0</div><div class="result-lbl">wpm</div></div>
+      <div class="result-block"><div class="result-num" id="rAcc">0%</div><div class="result-lbl">accuracy</div></div>
+      <div class="result-block"><div class="result-num" id="rErr">0</div><div class="result-lbl">errors</div></div>
+      <div class="result-block"><div class="result-num" id="rMode">—</div><div class="result-lbl">mode</div></div>
+    </div>
+    <button class="big-restart" id="bigR">↺ Try Again</button>
+  </div>
+  <div class="history-section">
+    <div class="history-title">recent results</div>
+    <ul class="history-list" id="histList"></ul>
+  </div>
+</section>
+
+<script>
+const WORDS=['the','be','to','of','and','a','in','that','have','it','for','not','on','with','he','as','you','do','at','this','but','his','by','from','they','we','say','her','she','or','an','will','my','one','all','would','there','their','what','so','up','out','if','about','who','get','which','go','me','when','make','can','like','time','no','just','him','know','take','people','into','year','your','good','some','could','them','see','other','than','then','now','look','only','come','its','over','think','also','back','after','use','two','how','our','work','first','well','way','even','new','want','because','any','these','give','day','most','us','great','between','need','large','often','hand','high','place','hold','turn','world','keep','point','city','play','small','number','off','always','move','live','tell','less','still','name','find','long','down','real','side','around','form','write','every','next','last','start','same','another','might','those','help','call','try','ask','room','right','door','open','begin','life','children','feet','land','without','once','early','earth','school','food','plant','air','line','mother','answer','found','study','learn','should','add','light','voice','power','town','fine','drive','fall','lead','dark','base','ago','plane','system','behind','ran','round','boat','game','force','bring','warm','common','explain','dry','language','shape','deep','yes','clear','yet','heat','full','hot','check','rule','among','noun','cannot','able','size','ball','special','heavy','pair','circle','include','built','felt','certain','train','fire','south','piece','told','knew','pass','since','top','whole','space','heard','best','hour','better','true','during','hundred','remember','step','west','ground','interest','reach','fast','sing','listen','table','travel','morning','simple','several','toward','war','lay','against','pattern','slow','center','love','person','money','serve','appear','road','rain','govern','pull','cold','notice','field','wood','upon','done','fly','gave','box','wait','correct','quickly','became','minutes','strong','fact','inches','street','surface','produce','building','ocean','class','nothing','rest','careful','blue','red','green','white','black','brown','clean','fresh','sharp','flat','clear','sweet','soft','loud','bright','slow','fast','old','young','long','short','tall','wide','deep','thick','dry','wet','warm','cool','hot','cold','hard','soft','heavy','light','open','close','full','empty','true','false','new','old','good','bad','big','small','round','square'];
+
+const $ = id => document.getElementById(id);
+const hidI=$('hi'),wordsEl=$('words'),wv=$('wv'),caretEl=$('caret'),tc=$('tc'),fo=$('fo');
+const dTime=$('dTime'),dWpm=$('dWpm'),dAcc=$('dAcc');
+const mainArea=$('mainArea'),resultsPanel=$('resultsPanel');
+const rWpm=$('rWpm'),rAcc=$('rAcc'),rErr=$('rErr'),rMode=$('rMode'),histList=$('histList');
+
+let s={};
+
+function rnd(n=250){const a=[];for(let i=0;i<n;i++)a.push(WORDS[Math.floor(Math.random()*WORDS.length)]);return a;}
+
+function init(){
+  clearInterval(s.tid);
+  s={
+    words:rnd(250),wEls:[],
+    wi:0,ci:0,buf:'',typed:[],
+    totalTyped:0,errors:0,correct:0,
+    mode:s.mode||15,timeLeft:s.mode||15,
+    tid:null,started:false,finished:false,focused:false,
+    blinkT:null
+  };
+  buildDOM();
+  updateStats();
+  renderWord();
+  mainArea.style.display='';
+  resultsPanel.style.display='none';
+  requestAnimationFrame(()=>{ updateScroll(); moveCaret(); focusIt(); });
+}
+
+function buildDOM(){
+  wordsEl.innerHTML='';s.wEls=[];
+  s.words.forEach((w,i)=>{
+    const d=document.createElement('div');
+    d.className='word';d.dataset.i=i;
+    for(const c of w){const sp=document.createElement('span');sp.className='char';sp.textContent=c;d.appendChild(sp);}
+    wordsEl.appendChild(d);s.wEls.push(d);
+  });
+}
+
+function addMoreWords(){
+  const extra=rnd(60);
+  extra.forEach(w=>{
+    s.words.push(w);
+    const d=document.createElement('div');d.className='word';
+    for(const c of w){const sp=document.createElement('span');sp.className='char';sp.textContent=c;d.appendChild(sp);}
+    wordsEl.appendChild(d);s.wEls.push(d);
+  });
+}
+
+function renderWord(){
+  const wEl=s.wEls[s.wi];if(!wEl)return;
+  const target=s.words[s.wi],buf=s.buf;
+  // remove extra spans beyond target length
+  const all=[...wEl.querySelectorAll('.char')];
+  all.forEach((sp,i)=>{if(i>=target.length)sp.remove();});
+  const spans=[...wEl.querySelectorAll('.char')];
+  spans.forEach((sp,i)=>{
+    sp.className='char';
+    if(i<buf.length) sp.classList.add(buf[i]===target[i]?'correct':'incorrect');
+  });
+  // extra chars
+  if(buf.length>target.length){
+    const ext=buf.slice(target.length);
+    // remove old extras first
+    [...wEl.querySelectorAll('.extra')].forEach(e=>e.remove());
+    for(const c of ext){const sp=document.createElement('span');sp.className='char extra';sp.textContent=c;wEl.appendChild(sp);}
+  }
+  wEl.classList.toggle('wrong-word', buf.length>0 && buf!==target.slice(0,buf.length));
+}
+
+function renderCommitted(i){
+  const wEl=s.wEls[i];if(!wEl)return;
+  const target=s.words[i],typed=s.typed[i]||'';
+  [...wEl.querySelectorAll('.char')].forEach((sp,j)=>{if(j>=target.length)sp.remove();});
+  const spans=[...wEl.querySelectorAll('.char')];
+  spans.forEach((sp,j)=>{
+    sp.className='char';
+    if(j<typed.length) sp.classList.add(typed[j]===target[j]?'correct':'incorrect');
+  });
+  if(typed.length>target.length){
+    const ext=typed.slice(target.length);
+    for(const c of ext){const sp=document.createElement('span');sp.className='char extra';sp.textContent=c;wEl.appendChild(sp);}
+  }
+  wEl.classList.toggle('wrong-word', typed!==target);
+}
+
+function moveCaret(){
+  const wEl=s.wEls[s.wi];if(!wEl)return;
+  const vr=wv.getBoundingClientRect();
+  const chars=[...wEl.querySelectorAll('.char')];
+  const idx=s.buf.length;
+  let left,top;
+  if(idx<chars.length){
+    const r=chars[idx].getBoundingClientRect();
+    left=r.left-vr.left; top=r.top-vr.top;
+  } else {
+    const last=chars[chars.length-1];
+    const r=last?last.getBoundingClientRect():wEl.getBoundingClientRect();
+    left=r.right-vr.left; top=r.top-vr.top;
+  }
+  const wr=wEl.getBoundingClientRect();
+  const ch=caretEl.offsetHeight;
+  caretEl.style.left=left+'px';
+  caretEl.style.top=(wr.top-vr.top+(wr.height-ch)/2)+'px';
+}
+
+function flashCaret(){
+  caretEl.classList.add('typing');
+  clearTimeout(s.blinkT);
+  s.blinkT=setTimeout(()=>caretEl.classList.remove('typing'),500);
+}
+
+function updateScroll(){
+  const wEl=s.wEls[s.wi];if(!wEl)return;
+  const lh=wEl.offsetHeight;
+  const shift=Math.max(0,wEl.offsetTop-lh);
+  wordsEl.style.transform=`translateY(-${shift}px)`;
+}
+
+function wpm(){
+  const el=s.mode-s.timeLeft;if(el<=0)return 0;
+  return Math.round((s.correct/5)/(el/60));
+}
+function acc(){return s.totalTyped===0?100:Math.round(s.correct/s.totalTyped*100);}
+
+function updateStats(){
+  dTime.textContent=s.timeLeft;
+  if(s.started){dWpm.textContent=wpm();dAcc.textContent=acc()+'%';}
+  else{dWpm.textContent='—';dAcc.textContent='—';}
+}
+
+function startTimer(){
+  if(s.tid)return;s.started=true;
+  s.tid=setInterval(()=>{s.timeLeft--;updateStats();if(s.timeLeft<=0)endTest();},1000);
+}
+
+function endTest(){
+  s.finished=true;clearInterval(s.tid);s.tid=null;
+  const w=wpm(),a=acc(),e=s.errors;
+  rWpm.textContent=w;rAcc.textContent=a+'%';rErr.textContent=e;rMode.textContent=s.mode+'s';
+  mainArea.style.display='none';resultsPanel.style.display='flex';
+  saveHist({wpm:w,acc:a,err:e,mode:s.mode,ts:Date.now()});
+  renderHist();
+}
+
+function saveHist(r){
+  let h=[];try{h=JSON.parse(localStorage.getItem('tf_hist'))||[];}catch{}
+  h.unshift(r);localStorage.setItem('tf_hist',JSON.stringify(h.slice(0,10)));
+}
+
+function renderHist(){
+  let h=[];try{h=JSON.parse(localStorage.getItem('tf_hist'))||[];}catch{}
+  if(!h.length){histList.innerHTML='<li class="history-empty">No results yet.</li>';return;}
+  histList.innerHTML=h.map((r,i)=>{
+    const d=new Date(r.ts).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+    return `<li class="hi"><span>#${i+1}</span><span class="hw">${r.wpm} wpm</span><span class="ha">${r.acc}%</span><span class="her">${r.err} err</span><span class="hm">${r.mode}s</span><span style="font-size:.68rem;color:var(--muted2)">${d}</span></li>`;
+  }).join('');
+}
+
+function commit(){
+  if(!s.buf.length)return;
+  s.typed[s.wi]=s.buf;
+  renderCommitted(s.wi);
+  s.wi++;s.ci=0;s.buf='';
+  if(s.wi>=s.words.length-20)addMoreWords();
+  renderWord();updateScroll();moveCaret();updateStats();
+}
+
+function backWord(){
+  if(s.wi===0)return;
+  s.wi--;s.buf=s.typed[s.wi]||'';
+  s.typed.splice(s.wi,1);
+  s.ci=s.buf.length;
+  renderWord();updateScroll();moveCaret();
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){e.preventDefault();init();return;}
+  if(!s.focused||s.finished)return;
+  const ignore=['Shift','Alt','Control','Meta','CapsLock','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'];
+  if(ignore.includes(e.key)||e.key.startsWith('F'))return;
+  if(e.key===' '||e.key==='Backspace')e.preventDefault();
+  flashCaret();
+  if(e.key===' '){commit();return;}
+  if(e.key==='Backspace'){
+    if(s.buf.length>0){s.buf=s.buf.slice(0,-1);}
+    else backWord();
+    renderWord();moveCaret();return;
+  }
+  if(e.key.length===1){
+    if(!s.started)startTimer();
+    const target=s.words[s.wi];
+    if(s.buf.length>=target.length+8)return;
+    const ci=s.buf.length;
+    s.buf+=e.key;s.totalTyped++;
+    if(ci<target.length&&e.key===target[ci])s.correct++;else s.errors++;
+    s.ci=s.buf.length;
+    renderWord();moveCaret();updateStats();
+  }
+});
+
+function focusIt(){hidI.focus();s.focused=true;tc.classList.remove('unfocused');}
+function unfocus(){s.focused=false;tc.classList.add('unfocused');}
+
+tc.addEventListener('click',focusIt);
+fo.addEventListener('click',focusIt);
+hidI.addEventListener('focus',()=>{s.focused=true;tc.classList.remove('unfocused');});
+hidI.addEventListener('blur',()=>{setTimeout(()=>{if(document.activeElement!==hidI)unfocus();},120);});
+hidI.addEventListener('input',()=>{hidI.value='';});
+document.addEventListener('keydown',e=>{if(!s.focused&&e.key.length===1&&!e.ctrlKey&&!e.metaKey)focusIt();});
+
+document.getElementById('modeNav').addEventListener('click',e=>{
+  const btn=e.target.closest('.mode-btn');if(!btn)return;
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  s.mode=parseInt(btn.dataset.s);init();
+});
+
+$('rBtn').addEventListener('click',init);
+$('bigR').addEventListener('click',init);
+
+let rt;window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>{updateScroll();moveCaret();},100);});
+
+init();
+</script>
+</body>
+</html>
